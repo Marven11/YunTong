@@ -104,16 +104,13 @@ async def startat(site: Site):
             logger.info("开始处理%s", repr(target))
             task = asyncio.create_task(handle_mods(target, queue, visited, reports_dict))
             coros.append(task)
-        elif coros:
-            if any(coro.done() for coro in coros):
-                done, coros = (
-                    [coro for coro in coros if coro.done()],
-                    [coro for coro in coros if not coro.done()],
-                )
-                for coro in done:
-                    await coro
-            else:
-                await coros.pop()
+        elif coros and any(coro.done() for coro in coros):
+            done, coros = (
+                [coro for coro in coros if coro.done()],
+                [coro for coro in coros if not coro.done()],
+            )
+            for coro in done:
+                await coro
         await asyncio.sleep(0)
     reports_dict = {
         name: [report.msg for report in reports]
