@@ -7,7 +7,7 @@ from collections import deque, defaultdict
 import yaml
 
 
-from yuntong.mod_checkcoments import CheckCommentsMod
+from yuntong.mod_checkcomments import CheckCommentsMod
 from yuntong.mod_checkheaders import CheckHeadersMod
 from yuntong.mod_checkhtmllinks import CheckHTMLLinksMod
 from yuntong.mod_checkform import CheckHTMLFormMod
