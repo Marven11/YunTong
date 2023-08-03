@@ -54,6 +54,15 @@ class CheckHTMLLinksMod(Mod):
                 path = re.sub(r"[^/]+/\.\./", "", path)
                 path = re.sub(r"\./", "", path)
                 paths.add(path)
+        for result in re.finditer(r"(?<=location=['\"])[0-9A-Za-z-_/.]+(?=['\"])", content.text):
+            print(result)
+            assert isinstance(result, re.Match), type(result)
+            path = result.group(0)
+            if not path.startswith("/"):
+                path = urlobj.path.removesuffix("/") + "/" + path
+            path = re.sub(r"[^/]+/\.\./", "", path)
+            path = re.sub(r"\./", "", path)
+            paths.add(path)
         for path in list(paths):
             p = path
             while "/" in p:
