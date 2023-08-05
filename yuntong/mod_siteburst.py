@@ -1,9 +1,12 @@
 import asyncio
 from pathlib import Path
+import random
 from urllib.parse import urlparse
 
 from .mod import Mod, Report, Page, ModTarget, SiteFolder
 from .requester import Requester
+
+BURST_BATCH = 500
 
 uris = [
     ".git",
@@ -247,13 +250,14 @@ uris = [
 httpfiles_dirsearch = []
 
 with open(
-    Path(__file__).parent / "fuzz_dict" / "httpfiles_dirsearch_php.txt", "r"
+    Path(__file__).parent / "fuzz_dict" / "httpfiles_dirsearch.txt", "r"
 ) as f:
     httpfiles_dirsearch = f.readlines()
     httpfiles_dirsearch = [param.strip() for param in httpfiles_dirsearch]
 
 uris = list(set(uris))
 uris_site = list(set(uris + httpfiles_dirsearch))
+random.shuffle(uris_site)
 sem = asyncio.Semaphore(5)
 
 
@@ -282,26 +286,28 @@ class SiteBurstMod(Mod):
             "GET", site_folder.url + "114514asdfkhawer.ahaha"
         )
         valid_uris = []
-        for batch_i in range(0, len(uri_lists), 500):
+        for batch_i in range(0, len(uri_lists), BURST_BATCH):
+            uri_batch = uri_lists[batch_i : batch_i + BURST_BATCH]
             results = await asyncio.gather(
                 *[
                     self.fetch_with_sem(site_folder.url + uri.removeprefix("/"))
-                    for uri in uri_lists[batch_i : batch_i + 500]
+                    for uri in uri_batch
                 ]
             )
             valid_uris += [
                 uri
-                for uri, result in zip(uri_lists, results)
+                for uri, result in zip(uri_batch, results)
                 if result.status_code == 200
                 and result.text != index_resp.text
                 and result.text != nonexist_resp.text
                 and result.text != ""
             ]
-            if batch_i + 500 < len(uri_lists):
+            self._logger.info(f"{site_folder.url} valid_uris更新如下：{valid_uris=}")
+            if batch_i + BURST_BATCH < len(uri_lists):
                 self._logger.info(
                     "爆破站点 %s 已经完成了%.2f%%",
                     site_folder.url,
-                    (batch_i + 500) / len(uri_lists) * 100,
+                    (batch_i + BURST_BATCH) / len(uri_lists) * 100,
                 )
             await asyncio.sleep(0)
         if not valid_uris:
