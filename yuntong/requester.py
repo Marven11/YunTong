@@ -34,7 +34,7 @@ class Requester:
                     method=method, url=url, params=params, data=data, headers=headers
                 )
             except Exception:
-                pass
+                await asyncio.sleep(0)
         return await self.request_once(
             method=method, url=url, params=params, data=data, headers=headers
         )
