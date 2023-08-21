@@ -3,6 +3,7 @@ import logging
 import reprlib
 import time
 from collections import deque, defaultdict
+from typing import Union
 
 import yaml
 
@@ -25,7 +26,7 @@ from yuntong.mod_sqlfuzz import SQLFuzzMod
 from yuntong.mod_sstifuzz import SSTIFuzzMod
 from yuntong.mod_visitsite import VisitSiteMod
 from yuntong.requester import StatefulRequester, StatelessRequester
-from yuntong.mod import Mod, ModTarget, Report, Site
+from yuntong.mod import Mod, ModTarget, Page, Report, Site
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('httpx').setLevel(logging.WARNING)
@@ -88,10 +89,11 @@ async def handle_mods(target: ModTarget, queue, visited, reports):
     )
     
 
-async def startat(site: Site):
+async def startat(site: Site, page: Page):
     queue = deque(
         [
             site,
+            page
         ]
     )
     visited = []

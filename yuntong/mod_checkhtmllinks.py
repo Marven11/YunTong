@@ -1,6 +1,5 @@
 import re
 from urllib.parse import urlparse, urlunparse
-from itertools import chain
 from bs4 import BeautifulSoup
 from .mod import Mod, HTTPContent, ModTarget, Report, Page, SiteFolder
 
