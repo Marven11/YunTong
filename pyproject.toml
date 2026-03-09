@@ -1,0 +1,25 @@
+[project]
+name = "yuntong"
+version = "0.1.0"
+description = "自用暴力扫描器"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "httpx",
+    "click",
+    "pyyaml",
+    "beautifulsoup4",
+]
+
+[tool.uv.sources]
+
+[tool.uv]
+
+[project.optional-dependencies]
+dev = [
+    "pyright",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

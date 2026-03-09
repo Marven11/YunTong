@@ -1,4 +1,0 @@
-httpx
-click
-pyyaml
-beautifulsoup4
