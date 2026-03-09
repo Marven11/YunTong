@@ -1,6 +1,6 @@
 # 云瞳
 
-自用暴力扫描器，`python -m yuntong --url 'http://xxxx.com'`
+自用暴力扫描器，`python -m yuntong scan --url 'http://xxxx.com'`
 
 主要特性
 - 提取HTML中的注释、表单、链接和HTTP异常Header

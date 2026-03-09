@@ -1,5 +1,6 @@
 import re
-from .mod import Mod, HTTPContent, ModTarget, Report
+from typing import List
+from .mod import Mod, HTTPContent, ModTarget, Report, ModCrackResult
 
 common_headers = set(
     [
@@ -142,16 +143,19 @@ common_headers = set(
         "X-Pingback",
         "X-Requested-With",
         "X-Robots-Tag",
-        "Etag"
+        "Etag",
     ]
 )
 
 
 class CheckHeadersMod(Mod):
-    async def check(self, thing: ModTarget):
+    async def check(self, thing: ModTarget) -> float:
         return 1 if isinstance(thing, HTTPContent) else 0
 
-    async def crack(self, content: HTTPContent):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, HTTPContent):
+            return []
+        content = thing
         uncommon_headers = {
             k: v for k, v in content.headers.items() if k not in common_headers
         }
@@ -162,7 +166,9 @@ class CheckHeadersMod(Mod):
             )
         if "Set-Cookie" in content.headers:
             reports.append(
-                Report(f"页面 {content.url} 设置了以下cookie: {content.headers['Set-Cookie']}")
+                Report(
+                    f"页面 {content.url} 设置了以下cookie: {content.headers['Set-Cookie']}"
+                )
             )
         if "Cookie" in content.headers:
             reports.append(

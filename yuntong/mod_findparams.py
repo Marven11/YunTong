@@ -3,8 +3,9 @@ import random
 from urllib.parse import urlparse
 from pathlib import Path
 
-from yuntong.mod import Mod, Page, ModTarget, Report
-from yuntong.requester import Requester
+from typing import List
+from .mod import Mod, Page, ModTarget, Report, ModCrackResult
+from .requester import Requester
 
 CHUNK_SIZE = 30
 
@@ -89,7 +90,7 @@ class FindParamsMod(Mod):
         self.requeser = requeser
         self.visited = set()
 
-    async def check(self, thing: ModTarget):
+    async def check(self, thing: ModTarget) -> float:
         if not isinstance(thing, Page):
             return 0
         if thing.url in self.visited:
@@ -124,7 +125,10 @@ class FindParamsMod(Mod):
             return respond_params
         return []
 
-    async def crack(self, page: Page):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Page):
+            return []
+        page = thing
         example_resp = await self.requeser.request("GET", page.url)
         self.visited.add(page.url)
         found_params = []
@@ -138,6 +142,10 @@ class FindParamsMod(Mod):
         if not found_params:
             return []
         if len(found_params) > 20:
-            return [Report(f"在页面 {page.url} 找到以下参数：{found_params}，因参数过多不选择继续分析")]
+            return [
+                Report(
+                    f"在页面 {page.url} 找到以下参数：{found_params}，因参数过多不选择继续分析"
+                )
+            ]
         new_page = Page(url=page.url, mightbe=[], params=found_params)
         return [Report(f"在页面 {page.url} 找到以下参数：{found_params}"), new_page]

@@ -1,7 +1,7 @@
 import asyncio
-from typing import List
+from typing import List, cast
 
-from .mod import Mod, Page, Report, VulunableParam
+from .mod import Mod, Page, Report, VulunableParam, ModTarget, ModCrackResult
 from .requester import Requester
 
 nonexist_files = [
@@ -69,13 +69,14 @@ class PHPIncludeCrackMod(Mod):
         super().__init__()
         self.requeser = requester
 
-    async def check(self, thing):
+    async def check(self, thing: ModTarget) -> float:
         if not isinstance(thing, VulunableParam):
             return 0
+        vulparam = thing
         params = (
-            thing.frompage.params
-            if thing.httpmethod == "GET"
-            else thing.frompage.data
+            vulparam.frompage.params
+            if vulparam.httpmethod == "GET"
+            else vulparam.frompage.data
         )
         if params is None:
             return 0
@@ -112,7 +113,10 @@ class PHPIncludeCrackMod(Mod):
         ]
         return respond_files
 
-    async def crack(self, vulparam: VulunableParam):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, VulunableParam):
+            return []
+        vulparam = thing
         results = await asyncio.gather(
             *[self.crack_with_pattern(vulparam, pattern) for pattern in patterns]
         )

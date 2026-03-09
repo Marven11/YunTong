@@ -1,8 +1,9 @@
 import asyncio
-from typing import List
+from typing import List, Optional, cast
 
-from .mod import Mod, Page, Report
-from .requester import Requester
+from .mod import Mod, Page, Report, ModTarget, ModCrackResult
+from .requester import Requester, HTTPMethod
+import httpx
 
 payloads = [
     ("echo 114*514", "58596"),
@@ -68,14 +69,21 @@ class PHPEvalFuzzMod(Mod):
         super().__init__()
         self.requeser = requester
 
-    async def check(self, thing):
+    async def check(self, thing: ModTarget) -> float:
         if not isinstance(thing, Page) or (not thing.params and not thing.data):
             return 0
         return 1
 
-    async def test_payloads(self, page, method, param_field, payloads):
+    async def test_payloads(
+        self,
+        page: Page,
+        method: HTTPMethod,
+        param_field: str,
+        payloads: List[tuple[str, str]],
+    ) -> List[httpx.Response]:
         target_params = page.params if method == "GET" else page.data
-
+        if target_params is None:
+            return []
         return await asyncio.gather(
             *[
                 self.requeser.submit_to(
@@ -87,7 +95,7 @@ class PHPEvalFuzzMod(Mod):
             ]
         )
 
-    async def crack_by_method(self, page, method):
+    async def crack_by_method(self, page: Page, method: HTTPMethod) -> List[Report]:
         reports: List[Report] = []
         target_params = page.params if method == "GET" else page.data
         if target_params is None:
@@ -134,13 +142,16 @@ class PHPEvalFuzzMod(Mod):
 
         return reports
 
-    async def crack(self, page):
-        assert isinstance(page, Page) and (page.params or page.data)
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Page) or (not thing.params and not thing.data):
+            return []
+        page = thing
+        methods: list[HTTPMethod] = ["GET", "POST"]
         reports_lists = await asyncio.gather(
-            *[self.crack_by_method(page, method) for method in ["GET", "POST"]]
+            *[self.crack_by_method(page, method) for method in methods]
         )
-        reports: List[Report] = [
-            report for reports in reports_lists for report in reports
+        reports: List[ModCrackResult] = [
+            report for report_list in reports_lists for report in report_list
         ]
 
         return reports

@@ -1,7 +1,7 @@
 import asyncio
-from typing import List
+from typing import List, cast
 
-from .mod import Mod, Page, Report
+from .mod import Mod, Page, Report, ModTarget, ModCrackResult
 from .requester import Requester
 
 payloads = [
@@ -25,12 +25,12 @@ payloads = [
             for pattern in [
                 "ECHO yun  tong",
                 "ECHO$IFS$9yun$IFS$9tong",
-                r"{ECHO,yun,tong}"
+                r"{ECHO,yun,tong}",
             ]
             for echo in [
                 "echo",
                 "ec'h'o",
-                "ec\"h\"o",
+                'ec"h"o',
             ]
         ],
         # ("echo yun  tong", "yun tong"),
@@ -40,13 +40,12 @@ payloads = [
 ]
 
 
-
 class ShellExecFuzzMod(Mod):
     def __init__(self, requester: Requester):
         super().__init__()
         self.requeser = requester
 
-    async def check(self, thing):
+    async def check(self, thing: ModTarget) -> float:
         if not isinstance(thing, Page) or (not thing.params and not thing.data):
             return 0
         return 1
@@ -83,13 +82,15 @@ class ShellExecFuzzMod(Mod):
                 break
         return reports
 
-    async def crack(self, page):
-        assert isinstance(page, Page) and (page.params or page.data)
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Page) or (not thing.params and not thing.data):
+            return []
+        page = thing
         reports_lists = await asyncio.gather(
             *[self.crack_by_method(page, method) for method in ["GET", "POST"]]
         )
-        reports: List[Report] = [
-            report for reports in reports_lists for report in reports
+        reports: List[ModCrackResult] = [
+            report for report_list in reports_lists for report in report_list
         ]
 
         return reports

@@ -1,4 +1,5 @@
-from .mod import Mod, Page, ModTarget, HTTPContent
+from typing import List
+from .mod import Mod, Page, ModTarget, HTTPContent, ModCrackResult
 from .requester import Requester
 
 
@@ -8,10 +9,13 @@ class ScrapeContentMod(Mod):
         self.requeser = requeser
         self.visited = set()
 
-    async def check(self, thing: ModTarget):
+    async def check(self, thing: ModTarget) -> float:
         return 1 if isinstance(thing, Page) and thing.url not in self.visited else 0
 
-    async def crack(self, page: Page):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Page):
+            return []
+        page = thing
         resp = await self.requeser.request(
             "GET", page.url, params=page.withparam, headers=page.withheaders
         )

@@ -15,11 +15,12 @@ dependencies = [
 
 [tool.uv]
 
-[project.optional-dependencies]
-dev = [
-    "pyright",
-]
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "black>=24.8.0",
+    "pyright>=1.1.408",
+]

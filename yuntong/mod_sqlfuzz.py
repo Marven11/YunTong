@@ -1,16 +1,16 @@
 import asyncio
 import re
-from typing import List
+from typing import List, Optional, cast
 
-from .mod import Mod, Page, Report
-from .requester import Requester
+from .mod import Mod, Page, Report, ModTarget, ModCrackResult
+from .requester import Requester, HTTPMethod
+import httpx
 
 payloads = [
     pattern.format(quote=quote)
     for pattern in [
         "{quote}||1=1||{quote}",
         "{quote} or 1=1 or {quote}",
-
         "{quote}||1||{quote}",
         "{quote}&&1&&{quote}6",
         "{quote} and 1 and {quote}6",
@@ -27,14 +27,14 @@ class SQLFuzzMod(Mod):
         self.requeser = requester
         self.visited = set()
 
-    async def check(self, thing):
+    async def check(self, thing: ModTarget) -> float:
         if not isinstance(thing, Page) or (not thing.params and not thing.data):
             return 0
         if thing.url in self.visited:
             return 0
         return 1
 
-    def random_value_by_name(self, name: str):
+    def random_value_by_name(self, name: str) -> str:
         if re.search("mail", name, re.IGNORECASE):
             return "a@a.com"
         if re.search("(name|user)", name, re.IGNORECASE):
@@ -43,9 +43,12 @@ class SQLFuzzMod(Mod):
             return "114514@#Aasd"
         return "asdf"
 
-    async def test_payloads(self, page, method, param_field, payloads):
+    async def test_payloads(
+        self, page: Page, method: HTTPMethod, param_field: str, payloads: List[str]
+    ) -> List[Optional[httpx.Response]]:
         target_params = page.params if method == "GET" else page.data
-
+        if target_params is None:
+            return []
         return await asyncio.gather(
             *[
                 self.requeser.submit_to(
@@ -60,7 +63,7 @@ class SQLFuzzMod(Mod):
             ]
         )
 
-    async def crack_by_method(self, page, method):
+    async def crack_by_method(self, page: Page, method: HTTPMethod) -> List[Report]:
         reports: List[Report] = []
         target_params = page.params if method == "GET" else page.data
         if target_params is None:
@@ -72,13 +75,15 @@ class SQLFuzzMod(Mod):
         )
         if example_resp is None:
             self._logger.warning(f"网络错误，无法进行SQL测试")
-            return
+            return []
         self._logger.info(f"开始测试{page}是否含有可以进行SQL的参数")
 
         for param in target_params:
             valid_payloads = []
             result = await self.test_payloads(page, method, param, payloads)
             for payload, resp in zip(payloads, result):
+                if resp is None or example_resp is None:
+                    continue
                 if (
                     resp.status_code == example_resp.status_code
                     and resp.text == example_resp.text
@@ -95,14 +100,17 @@ class SQLFuzzMod(Mod):
             )
         return reports
 
-    async def crack(self, page):
-        assert isinstance(page, Page) and (page.params or page.data)
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Page) or (not thing.params and not thing.data):
+            return []
+        page = thing
         self.visited.add(page.url)
+        methods: list[HTTPMethod] = ["GET", "POST"]
         reports_lists = await asyncio.gather(
-            *[self.crack_by_method(page, method) for method in ["GET", "POST"]]
+            *[self.crack_by_method(page, method) for method in methods]
         )
-        reports: List[Report] = [
-            report for reports in reports_lists for report in reports
+        reports: List[ModCrackResult] = [
+            report for report_list in reports_lists for report in report_list
         ]
 
         return reports

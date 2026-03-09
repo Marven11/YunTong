@@ -1,7 +1,7 @@
 import asyncio
 from typing import List
 
-from .mod import Mod, Page, Report, VulunableParam
+from .mod import Mod, Page, Report, VulunableParam, ModTarget, ModCrackResult
 from .requester import Requester
 
 payloads = [
@@ -36,7 +36,7 @@ class PHPIncludeFuzzMod(Mod):
         super().__init__()
         self.requeser = requester
 
-    async def check(self, thing):
+    async def check(self, thing: ModTarget) -> float:
         if not isinstance(thing, Page) or not thing.params:
             return 0
         return 1
@@ -71,10 +71,15 @@ class PHPIncludeFuzzMod(Mod):
 
         return reports
 
-    async def crack(self, page):
-        assert isinstance(page, Page) and page.params
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Page) or not thing.params:
+            return []
+        page = thing
+        assert page.params is not None
         results = await asyncio.gather(
             *[self.crack_with_method(page, method) for method in ["GET", "POST"]]
         )
-        reports = [report for reports in results for report in reports]
+        reports: List[ModCrackResult] = [
+            report for report_list in results for report in report_list
+        ]
         return reports

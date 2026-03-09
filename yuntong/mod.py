@@ -57,8 +57,7 @@ class VulunableParam:
     param: str
 
 
-
-ModTarget = Union[Site, Page, HTTPContent]
+ModTarget = Union[Site, SiteFolder, Page, HTTPContent]
 
 
 @dataclass

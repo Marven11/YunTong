@@ -1,13 +1,16 @@
-from .mod import Mod, Page, ModTarget, HTTPContent, Report
+from typing import List
+from .mod import Mod, Page, ModTarget, HTTPContent, Report, ModCrackResult
 from .requester import Requester
 import asyncio
 from pathlib import Path
 from base64 import b64encode
 
-def base64_encode(s):
+
+def base64_encode(s: str) -> str:
     return b64encode(s.encode()).decode()
 
-passwords = []
+
+passwords: List[str] = []
 with open(Path(__file__).parent / "fuzz_dict" / "passwords100.txt", "r") as f:
     passwords = f.readlines()
     passwords = [password.strip() for password in passwords]
@@ -19,10 +22,13 @@ class PageAuthBurstMod(Mod):
         self.requeser = requeser
         self.visited = set()
 
-    async def check(self, thing: ModTarget):
+    async def check(self, thing: ModTarget) -> float:
         return 1 if isinstance(thing, HTTPContent) and thing.code == 401 else 0
 
-    async def crack(self, content: HTTPContent):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, HTTPContent):
+            return []
+        content = thing
         headers = content.frompage.withheaders if content.frompage.withheaders else {}
         resps = await asyncio.gather(
             *[
@@ -30,7 +36,9 @@ class PageAuthBurstMod(Mod):
                     "GET",
                     content.url,
                     params=content.frompage.withparam,
-                    headers={"Authorization": "Basic " + base64_encode("admin:" + password)}
+                    headers={
+                        "Authorization": "Basic " + base64_encode("admin:" + password)
+                    }
                     | headers,
                 )
                 for password in passwords
@@ -51,7 +59,9 @@ class PageAuthBurstMod(Mod):
                 mightbe=[],
                 params=content.frompage.params,
                 withparam=content.frompage.withparam,
-                withheaders={"Authorization": "Basic " + base64_encode("admin:" + password)}
+                withheaders={
+                    "Authorization": "Basic " + base64_encode("admin:" + password)
+                }
                 | headers,
             ),
         ]

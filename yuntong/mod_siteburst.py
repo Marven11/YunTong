@@ -3,7 +3,8 @@ from pathlib import Path
 import random
 from urllib.parse import urlparse
 
-from .mod import Mod, Report, Page, ModTarget, SiteFolder
+from typing import List
+from .mod import Mod, Report, Page, ModTarget, SiteFolder, ModCrackResult
 from .requester import Requester
 
 BURST_BATCH = 500
@@ -249,9 +250,7 @@ uris = [
 
 httpfiles_dirsearch = []
 
-with open(
-    Path(__file__).parent / "fuzz_dict" / "httpfiles_dirsearch.txt", "r"
-) as f:
+with open(Path(__file__).parent / "fuzz_dict" / "httpfiles_dirsearch.txt", "r") as f:
     httpfiles_dirsearch = f.readlines()
     httpfiles_dirsearch = [param.strip() for param in httpfiles_dirsearch]
 
@@ -276,9 +275,14 @@ class SiteBurstMod(Mod):
             1 if isinstance(thing, SiteFolder) and thing.url not in self.visited else 0
         )
 
-    async def crack(self, site_folder: SiteFolder):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, SiteFolder):
+            return []
+        site_folder = thing
         uri_lists = uris_site if urlparse(site_folder.url).path == "/" else uris
-        self._logger.info("开始爆破站点 %s, 使用的字典长度为%d", site_folder.url, len(uri_lists))
+        self._logger.info(
+            "开始爆破站点 %s, 使用的字典长度为%d", site_folder.url, len(uri_lists)
+        )
 
         self.visited.add(site_folder.url)
         index_resp = await self.requester.request("GET", site_folder.url)
@@ -288,7 +292,7 @@ class SiteBurstMod(Mod):
         valid_uris = []
         for batch_i in range(0, len(uri_lists), BURST_BATCH):
             uri_batch = uri_lists[batch_i : batch_i + BURST_BATCH]
-            results = await asyncio.gather(
+            responses = await asyncio.gather(
                 *[
                     self.fetch_with_sem(site_folder.url + uri.removeprefix("/"))
                     for uri in uri_batch
@@ -296,11 +300,11 @@ class SiteBurstMod(Mod):
             )
             valid_uris += [
                 uri
-                for uri, result in zip(uri_batch, results)
-                if result.status_code == 200
-                and result.text != index_resp.text
-                and result.text != nonexist_resp.text
-                and result.text != ""
+                for uri, resp in zip(uri_batch, responses)
+                if resp.status_code == 200
+                and resp.text != index_resp.text
+                and resp.text != nonexist_resp.text
+                and resp.text != ""
             ]
             self._logger.info(f"{site_folder.url} valid_uris更新如下：{valid_uris=}")
             if batch_i + BURST_BATCH < len(uri_lists):
@@ -312,9 +316,14 @@ class SiteBurstMod(Mod):
             await asyncio.sleep(0)
         if not valid_uris:
             return []
-        return [
-            Report(f"爆破站点目录 {site_folder.url} 完毕，其中存在以下文件泄露：{valid_uris}"),
-        ] + [
-            Page(url=site_folder.url + uri.removeprefix("/"), mightbe=[])
-            for uri in valid_uris
-        ]
+        results: List[ModCrackResult] = []
+        results.append(
+            Report(
+                f"爆破站点目录 {site_folder.url} 完毕，其中存在以下文件泄露：{valid_uris}"
+            )
+        )
+        for uri in valid_uris:
+            results.append(
+                Page(url=site_folder.url + uri.removeprefix("/"), mightbe=[])
+            )
+        return results

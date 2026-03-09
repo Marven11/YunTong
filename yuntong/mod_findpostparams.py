@@ -1,11 +1,12 @@
 import asyncio
 import random
 
-from .mod import Mod, Page, ModTarget, Report
+from typing import List
+from .mod import Mod, Page, ModTarget, Report, ModCrackResult
 from .requester import Requester
 from pathlib import Path
 
-CHUNK_SIZE = 200 # POST可以承载更多的数据
+CHUNK_SIZE = 200  # POST可以承载更多的数据
 
 params = [
     "name",
@@ -54,8 +55,7 @@ payloads = [
     "1234",
     "id",
     "echo 123;",
-    "print_r`id`;"
-    "?>114514",
+    "print_r`id`;" "?>114514",
     "{{114514}}",
     "/proc/net/arp",
     "data://text/plain,asdf",
@@ -82,13 +82,14 @@ payloads = [
 ]
 sem = asyncio.Semaphore(8)
 
+
 class FindPostParamsMod(Mod):
     def __init__(self, requeser: Requester):
         super().__init__()
         self.requeser = requeser
         self.visited = set()
 
-    async def check(self, thing: ModTarget):
+    async def check(self, thing: ModTarget) -> float:
         return 1 if isinstance(thing, Page) and thing.url not in self.visited else 0
 
     async def request_with_sem(self, url, data):
@@ -104,33 +105,37 @@ class FindPostParamsMod(Mod):
                 continue
 
             results = await asyncio.gather(
-                *[
-                    self.request_with_sem(page.url, data={p: payload})
-                    for p in params
-                ]
+                *[self.request_with_sem(page.url, data={p: payload}) for p in params]
             )
             respond_params = [
-                p
-                for p, resp in zip(params, results)
-                if resp.text != example_resp.text
+                p for p, resp in zip(params, results) if resp.text != example_resp.text
             ]
             if not respond_params:
                 continue
             return respond_params
         return []
 
-    async def crack(self, page: Page):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Page):
+            return []
+        page = thing
         example_resp = await self.requeser.request("POST", page.url)
         self.visited.add(page.url)
         found_params = []
-        params_lists = await asyncio.gather(*[
-            self.crack_params(page, example_resp, params[i : i + CHUNK_SIZE])
-            for i in range(0, len(params), CHUNK_SIZE)
-        ])
+        params_lists = await asyncio.gather(
+            *[
+                self.crack_params(page, example_resp, params[i : i + CHUNK_SIZE])
+                for i in range(0, len(params), CHUNK_SIZE)
+            ]
+        )
         found_params = [param for params in params_lists for param in params]
         if not found_params:
             return []
         if len(found_params) > 20:
-            return [Report(f"在页面 {page.url} 找到以下参数：{found_params}，因参数过多不选择继续分析")]
-        new_page = Page(url=page.url, mightbe=[], params = page.params, data=found_params)
+            return [
+                Report(
+                    f"在页面 {page.url} 找到以下参数：{found_params}，因参数过多不选择继续分析"
+                )
+            ]
+        new_page = Page(url=page.url, mightbe=[], params=page.params, data=found_params)
         return [Report(f"在页面 {page.url} 找到以下参数：{found_params}"), new_page]

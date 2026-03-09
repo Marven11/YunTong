@@ -1,6 +1,7 @@
 import logging
-from typing import Dict, Literal
+from typing import Dict, Literal, Optional
 import httpx
+from httpx._types import RequestData
 import asyncio
 import time
 
@@ -14,6 +15,7 @@ interval = 0.002
 
 HTTPMethod = Literal["GET", "POST"]
 
+
 def calculate_speed(last_req_times):
     assert len(last_req_times) >= 20
     sample_length = min(len(last_req_times) // 20 * 20, 100)
@@ -21,12 +23,25 @@ def calculate_speed(last_req_times):
 
 
 class Requester:
+
     async def request_once(
-        self, method: HTTPMethod, url: str, params: Dict[str, str] | None=None, data=None, headers=None
+        self,
+        method: HTTPMethod,
+        url: str,
+        params: Optional[Dict[str, str]] = None,
+        data: Optional[RequestData] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> httpx.Response:
         raise NotImplementedError()
 
-    async def request(self, method, url, params=None, data=None, headers=None):
+    async def request(
+        self,
+        method: HTTPMethod,
+        url: str,
+        params: Optional[Dict[str, str]] = None,
+        data: Optional[RequestData] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> httpx.Response:
         for _ in range(4):
             await self.wait_interval()
             try:
@@ -39,7 +54,9 @@ class Requester:
             method=method, url=url, params=params, data=data, headers=headers
         )
 
-    async def submit_to(self, url, method, params):
+    async def submit_to(
+        self, url: str, method: HTTPMethod, params: Dict[str, str]
+    ) -> httpx.Response:
         if method == "GET":
             return await self.request(
                 "GET",
@@ -69,16 +86,21 @@ class Requester:
             if req_counts % 100 == 0:
                 speed = calculate_speed(last_req_times)
                 logger.info(
-                    "已经发出了%d次HTTP请求，速度为%.2freq/s",
-                    req_counts,
-                    speed
+                    "已经发出了%d次HTTP请求，速度为%.2freq/s", req_counts, speed
                 )
             if req_counts > 1000:
                 last_req_times.pop(0)
 
 
 class StatelessRequester(Requester):
-    async def request_once(self, method, url, params=None, data=None, headers=None):
+    async def request_once(
+        self,
+        method: HTTPMethod,
+        url: str,
+        params: Optional[Dict[str, str]] = None,
+        data: Optional[RequestData] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> httpx.Response:
         async with sem, httpx.AsyncClient(timeout=5) as client:
             resp = await client.request(
                 method=method, url=url, params=params, data=data, headers=headers
@@ -94,7 +116,14 @@ class StatefulRequester(Requester):
         super().__init__()
         self.client = httpx.AsyncClient(timeout=5)
 
-    async def request_once(self, method, url, params=None, data=None, headers=None):
+    async def request_once(
+        self,
+        method: HTTPMethod,
+        url: str,
+        params: Optional[Dict[str, str]] = None,
+        data: Optional[RequestData] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> httpx.Response:
         async with sem:
             resp = await self.client.request(
                 method=method, url=url, params=params, data=data, headers=headers

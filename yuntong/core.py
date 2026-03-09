@@ -29,11 +29,12 @@ from yuntong.requester import StatefulRequester, StatelessRequester
 from yuntong.mod import Mod, ModTarget, Page, Report, Site
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 reprer = reprlib.Repr()
 reprer.maxstring = 50
 HANDLE_MOD_INTERVAL = 0.2
+
 
 def default_requester():
     return StatefulRequester()
@@ -62,6 +63,7 @@ mods = [
 handle_mod_lock = asyncio.Lock()
 handle_mod_last_run_time = time.perf_counter()
 
+
 async def handle_mod(mod: Mod, target: ModTarget, queue, reports):
     global handle_mod_last_run_time
     if await mod.check(target) == 0:
@@ -74,28 +76,24 @@ async def handle_mod(mod: Mod, target: ModTarget, queue, reports):
     results = await mod.crack(target)
     for result in results:
         if isinstance(result, Report):
-            logger.info(f"模块{mod.__class__.__name__}产生了新的报告：{reprer.repr(result.msg)}")
+            logger.info(
+                f"模块{mod.__class__.__name__}产生了新的报告：{reprer.repr(result.msg)}"
+            )
             reports[mod.__class__.__name__].append(result)
         else:
             logger.info(f"模块{mod.__class__.__name__}有了新的发现：{result}")
             queue.append(result)
 
+
 async def handle_mods(target: ModTarget, queue, visited, reports):
     if any(target == other for other in visited):
         return
     visited.append(target)
-    await asyncio.gather(
-        *[handle_mod(mod, target, queue, reports) for mod in mods]
-    )
-    
+    await asyncio.gather(*[handle_mod(mod, target, queue, reports) for mod in mods])
+
 
 async def startat(site: Site, page: Page):
-    queue = deque(
-        [
-            site,
-            page
-        ]
-    )
+    queue = deque([site, page])
     visited = []
     reports_dict = defaultdict(list)
     coros = []
@@ -104,7 +102,9 @@ async def startat(site: Site, page: Page):
         if queue:
             target = queue.popleft()
             logger.info("开始处理%s", repr(target))
-            task = asyncio.create_task(handle_mods(target, queue, visited, reports_dict))
+            task = asyncio.create_task(
+                handle_mods(target, queue, visited, reports_dict)
+            )
             coros.append(task)
         elif coros and any(coro.done() for coro in coros):
             done, coros = (
@@ -120,5 +120,6 @@ async def startat(site: Site, page: Page):
     }
     logger.info("输出报告到reports.yaml...")
     with open("reports.yaml", "w") as f:
-        yaml.dump(reports_dict, f, encoding="utf-8", allow_unicode=True, default_style="|")
-
+        yaml.dump(
+            reports_dict, f, encoding="utf-8", allow_unicode=True, default_style="|"
+        )

@@ -1,8 +1,9 @@
 import asyncio
+from typing import List
 
 from yuntong.mod import ModTarget
 
-from .mod import Mod, Report, Site
+from .mod import Mod, Report, Site, ModCrackResult
 from .requester import Requester
 
 uris = [
@@ -26,7 +27,10 @@ class SiteInfoLeakMod(Mod):
     async def check(self, thing: ModTarget) -> float:
         return 1 if isinstance(thing, Site) else 0
 
-    async def crack(self, site: Site):
+    async def crack(self, thing: ModTarget) -> List[ModCrackResult]:
+        if not isinstance(thing, Site):
+            return []
+        site = thing
         index_resp = await self.requester.request("GET", site.url)
         unexist_resp = await self.requester.request(
             "GET", site.url + "/whatareyoudoing.nonexist"
